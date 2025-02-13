@@ -67,6 +67,8 @@ let wristIKTargetBone = null;
 let arm_L = null;
 let armadillo_W = null;
 let neck_W = null;
+const armWorldPosition = new THREE.Vector3();
+const neckWorldPosition = new THREE.Vector3();
 
 function logHierarchy(object, indent = "") {
   console.log(indent + (object.name || object.type));
@@ -223,23 +225,61 @@ function updateLaser(laser, eyePosition, targetPosition) {
   }
 }
 
-function isPointInCone(point, apex, maxAngle) {
+function isPointInCone(point, apex, maxAngle, height, direction, color) {
   const V = new THREE.Vector3().subVectors(point, apex); // Vector from apex to point
-  const D = new THREE.Vector3(1, 0, 0); // Cone direction (downward)
-  console.log(D);
+  const D = direction; // Cone direction (downward)
+
+  visualizeCone(apex, D, maxAngle, height, color);
+
+  // console.log(D);
 
   // Normalize both vectors
   V.normalize();
   D.normalize();
 
-  // Calculate the cosine of the angle between V and D
+  // Calculate the cosine of the angle between V and Df
   const cosTheta = V.dot(D);
 
   // Calculate the threshold for the maximum angle
   const cosMaxAngle = Math.cos(maxAngle);
 
+  // console.log("apex-z:",apex.z);
+  // console.log("point-z",point)
   // Check if the point is inside the cone and on the "southern side"
-  return cosTheta >= cosMaxAngle && point.y < apex.y;
+  if (D.z === 1) {
+    return cosTheta >= cosMaxAngle && apex.distanceTo(point) <= LaserDistance;
+    // return true;
+  } else if (D.x === 1) {
+    return cosTheta >= cosMaxAngle && D.y <= height;
+  } 
+}
+
+function visualizeCone(apex, direction, maxAngle, height, color) {
+  // Calculate the radius of the cone base using the height and maxAngle
+  const radius = height * Math.tan(maxAngle);
+
+  // Create the cone geometry
+  const coneGeometry = new THREE.ConeGeometry(radius, height, 32);
+  const coneMaterial = new THREE.MeshBasicMaterial({
+    color: color,
+    wireframe: true
+  });
+  const cone = new THREE.Mesh(coneGeometry, coneMaterial);
+
+  // Position the cone at the apex
+  cone.position.copy(apex);
+
+  // Adjust the position to move the tip of the cone to the apex
+  const tipOffset = direction.clone().normalize().multiplyScalar(height / 2);
+  cone.position.add(tipOffset);
+  cone.scale.y = -1;
+
+  // Orient the cone to face the direction vector
+  const axis = new THREE.Vector3(0, 1, 0); // Default cone direction is along the Y-axis
+  cone.quaternion.setFromUnitVectors(axis, direction.normalize());
+  cone.add(new THREE.AxesHelper(10));
+  // Add the cone to the scene
+  scene.add(cone);
 }
 
 function checkKeyboard() {
@@ -256,7 +296,7 @@ function checkKeyboard() {
   const targetPosition = sphere.position.clone().add(sphereOffset.value);
 
   if (armadillo_W) {
-    console.log(`armadillo is ${armadillo_W}`);
+    // console.log(`armadillo is ${armadillo_W}`);
     if (wristIKTargetBone) {
       if (wristIKTargetBone.parent) {
         const localTargetPosition = targetPosition.clone();
@@ -269,13 +309,19 @@ function checkKeyboard() {
       }
 
       // Ensure neck_W position is in world coordinates
-      const neckWorldPosition = new THREE.Vector3();
+
       neck_W.getWorldPosition(neckWorldPosition);
 
-      console.log("Target Position:", targetPosition);
-      console.log("Neck World Position:", neckWorldPosition);
-
-      if (isPointInCone(targetPosition, neckWorldPosition, Math.PI / 2)) {
+      if (
+        isPointInCone(
+          targetPosition,
+          neckWorldPosition,
+          Math.PI / 3,
+          LaserDistance,
+          new THREE.Vector3(0, 0, 1),
+          0xff0000
+        )
+      ) {
         leftEye.lookAt(targetPosition);
         rightEye.lookAt(targetPosition);
         // update laser.
@@ -287,14 +333,27 @@ function checkKeyboard() {
         leftLaser.visible = false;
         rightLaser.visible = false;
       }
-      // if (isPointInCone(targetPosition, arm_L, Math.PI / 3)) {
-      if (ikSolver) {
-        ikSolver.update();
+
+      // Ensure neck_W position is in world coordinates
+      arm_L.getWorldPosition(armWorldPosition);
+
+      if (
+        isPointInCone(
+          targetPosition,
+          armWorldPosition,
+          Math.PI / 3,
+          10,
+          new THREE.Vector3(1, 0, 0),
+          0x00ff00
+        )
+      ) {
+        if (ikSolver) {
+          ikSolver.update();
+        }
+        if (ikHelper) {
+          ikHelper.updateMatrixWorld(true);
+        }
       }
-      if (ikHelper) {
-        ikHelper.updateMatrixWorld(true);
-      }
-      // }
     } else {
       console.error("wristIKTargetBone is not defined!");
     }
