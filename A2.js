@@ -225,12 +225,10 @@ function updateLaser(laser, eyePosition, targetPosition) {
   }
 }
 
-function isPointInCone(point, apex, maxAngle, height, direction, color) {
+function isPointInCone(point, apex, maxAngle, height, direction) {
   const V = new THREE.Vector3().subVectors(point, apex); // Vector from apex to point
   const D = direction; // Cone direction (downward)
-
-  visualizeCone(apex, D, maxAngle, height, color);
-
+  const V1 = V.clone(); 
   // console.log(D);
 
   // Normalize both vectors
@@ -250,8 +248,8 @@ function isPointInCone(point, apex, maxAngle, height, direction, color) {
     return cosTheta >= cosMaxAngle && apex.distanceTo(point) <= LaserDistance;
     // return true;
   } else if (D.x === 1) {
-    return cosTheta >= cosMaxAngle && D.y <= height;
-  } 
+    return cosTheta >= cosMaxAngle && V1.x <= height;
+  }
 }
 
 function visualizeCone(apex, direction, maxAngle, height, color) {
@@ -312,14 +310,20 @@ function checkKeyboard() {
 
       neck_W.getWorldPosition(neckWorldPosition);
 
+      // visualizeCone(
+      //   neckWorldPosition,
+      //   new THREE.Vector3(0, 0, 1),
+      //   Math.PI / 3,
+      //   LaserDistance,
+      //   0xff0000
+      // );
       if (
         isPointInCone(
           targetPosition,
           neckWorldPosition,
           Math.PI / 3,
           LaserDistance,
-          new THREE.Vector3(0, 0, 1),
-          0xff0000
+          new THREE.Vector3(0, 0, 1)
         )
       ) {
         leftEye.lookAt(targetPosition);
@@ -336,13 +340,19 @@ function checkKeyboard() {
 
       // Ensure neck_W position is in world coordinates
       arm_L.getWorldPosition(armWorldPosition);
-
+      visualizeCone(
+        armWorldPosition,
+        new THREE.Vector3(1, 0, 0),
+        Math.PI / 3,
+        5,
+        0x00ff00
+      );
       if (
         isPointInCone(
           targetPosition,
           armWorldPosition,
           Math.PI / 3,
-          10,
+          5,
           new THREE.Vector3(1, 0, 0),
           0x00ff00
         )
